@@ -1,68 +1,28 @@
-from rest_framework import generics
-from django.db.models import Avg
-from rest_framework.response import Response
-from rest_framework.views import APIView
-
-from .models import Category, Product, Review
-from .serializers import CategorySerializer, ProductSerializer, ReviewSerializer
+from rest_framework import viewsets, permissions, mixins
+from rest_framework.decorators import action
+from users.permissions import IsModerator
+from .models import Product
+from .serializers import ProductSerializer
 
 
-# ===== CATEGORY =====
-
-class CategoryListAPIView(generics.ListCreateAPIView):
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
-
-
-class CategoryDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
-    lookup_field = 'id'
-
-
-# ===== PRODUCT =====
-
-class ProductListAPIView(generics.ListCreateAPIView):
+class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-
-
-class ProductDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Product.objects.all()
-    serializer_class = ProductSerializer
-    lookup_field = 'id'
-
-
-# ===== REVIEW =====
-
-class ReviewListAPIView(generics.ListCreateAPIView):
-    queryset = Review.objects.all()
-    serializer_class = ReviewSerializer
-
-
-class ReviewDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Review.objects.all()
-    serializer_class = ReviewSerializer
-    lookup_field = 'id'
-
-
-# ===== PRODUCT REVIEWS (ДЗ 2) =====
-
-class ProductReviewsAPIView(APIView):
-    def get(self, request):
-        products = Product.objects.all()
-        data = []
-
-        for product in products:
-            reviews = product.reviews.all()
-            total = sum([r.stars for r in reviews])
-            rating = total / len(reviews) if reviews else 0
-
-            data.append({
-                "id": product.id,
-                "title": product.title,
-                "reviews": ReviewSerializer(reviews, many=True).data,
-                "rating": round(rating, 2)
-            })
-
-        return Response(data)
+    
+    def get_permissions(self):
+        # GET запросы - может любой аутентифицированный
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [permissions.IsAuthenticated]
+        
+        # POST (создание) - только админы (is_superuser)
+        elif self.action == 'create':
+            permission_classes = [permissions.IsAdminUser]
+        
+        # PUT, PATCH, DELETE - модераторы (is_staff, но не создают)
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            permission_classes = [permissions.IsAuthenticated, IsModerator]
+        
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        
+        return [permission() for permission in permission_classes]
