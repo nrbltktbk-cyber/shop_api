@@ -7,8 +7,8 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.generics import CreateAPIView
 from rest_framework.response import Response
+from . import utils
 
-from .models import ConfirmationCode
 from .serializers import (
     AuthValidateSerializer,
     ConfirmationSerializer,
@@ -67,8 +67,12 @@ class RegistrationAPIView(CreateAPIView):
 
             # Create a random 6-digit code
             code = "".join(random.choices(string.digits, k=6))
+            
+        code = utils.generate_confirmation_code()
+        utils.save_code_to_cache(user.email, code)
+        print('Code generated and saved to cache')
+        
 
-            confirmation_code = ConfirmationCode.objects.create(user=user, code=code)
 
         return Response(
             status=status.HTTP_201_CREATED,
@@ -92,7 +96,6 @@ class ConfirmUserAPIView(CreateAPIView):
 
             token, _ = Token.objects.get_or_create(user=user)
 
-            ConfirmationCode.objects.filter(user=user).delete()
 
         return Response(
             status=status.HTTP_200_OK,
